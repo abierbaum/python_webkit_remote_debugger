@@ -1,0 +1,8 @@
+--- 
+deps/websocket-client: 
+  branch: master
+  remote: master/braid/deps/websocket-client
+  revision: 0b8c7e0aac5a707cb9ae0f5acfaddfde02c7b9fa
+  squashed: true
+  type: git
+  url: git://github.com/liris/websocket-client.git
