@@ -2,13 +2,18 @@
 # Application to connect and record a trace of a webapp
 #
 import json
+import logging
 import optparse
 import os
 import urllib
 import urllib2
+import re
 import socket
 import sys
+import time
 import types
+
+from objects import Bunch
 
 file_dir  = os.path.abspath(os.path.dirname(__file__))
 deps_dir  = os.path.abspath(os.path.join(file_dir, '..', 'deps'))
@@ -18,6 +23,8 @@ for pdir in ['websocket-client']:
 
 from websocket import WebSocket, WebSocketApp
 
+logging.basicConfig()
+logging.getLogger().setLevel(logging.DEBUG)
 
 def parseOptions():
    usage = "%prog [options] page_num"
@@ -47,8 +54,13 @@ class TracerApp(object):
       self.port     = options.port
       self.page_num = options.page_num
 
+      self.timeStart = time.mktime(time.localtime())
+
       self.ws_url = None
       self.ws     = None
+
+      self._requestDetails = {}   # Map of details about a request
+
 
    def showConnectionList(self):
       """
@@ -106,11 +118,18 @@ class TracerApp(object):
       self.send('Network.enable')
 
    def onMessage(self, ws, message):
-      #msg_data = json.loads(message)
+      # Decode message into a bunch object to make easier to access attributes
+      # but store original message so we can get to it
+      msg = Bunch.loads(message)
+      msg._rawMsg = json.loads(message)
 
-      #print "< raw: ", message
-      #print json.dumps(msg_data, sort_keys=True, indent=3)
-      self.prettyPrintMsg(message)
+      if hasattr(msg, 'result'):
+         self.handleResultMsg(msg)
+      elif hasattr(msg, 'method'):
+         self.handleMethodMsg(msg)
+      else:
+         print "UNKNOWN MSG TYPE: "
+         self.prettyPrintMsg(msg_data)
 
    def onError(self, ws, error):
       print "error: ", error
@@ -123,7 +142,106 @@ class TracerApp(object):
    def prettyPrintMsg(self, msg):
       if type(msg) in types.StringTypes:
          msg = json.loads(msg)
+      elif type(msg) == Bunch:
+         msg = json.loads(msg._rawMsg)
+
       print json.dumps(msg, sort_keys=True, indent=3)
+
+
+   # --- MSG Helpers --- #
+   def handleResultMsg(self, msg):
+      print "RESULT: [%s]" % msg.id
+      print json.dumps(msg._rawMsg['result'], sort_keys=True, indent=3)
+
+
+   def handleMethodMsg(self, msg):
+      """
+      Try to map method name to a local handler.
+      get name as: 'handle' + method in camel case and no .'s
+      """
+      def replace(match):
+         return match.group()[1].upper()
+
+      method         = msg.method
+      handler_name   = 'handle' + re.sub('\.\w', replace, method)
+      handler_method = getattr(self, handler_name, self.handleNotificationDefault)
+      handler_method(msg)
+
+
+   def handleNotificationDefault(self, msg):
+      """ By default just print the method name. """
+      print self.getMethodHeader(msg)
+
+   # --- Network Notification Processing --- #
+   def handleNetworkDataReceived(self, msg):
+      print self.getMethodHeader(msg)
+      print "  request: ", self.getRequestSummary(msg)
+      print "  dataLen: ", msg.params.dataLength
+
+   def handleNetworkLoadingFailed(self, msg):
+      print self.getMethodHeader(msg)
+      print "  request: ", self.getRequestSummary(msg)
+      print "    error: ", msg.params.errorText
+
+   def handleNetworkLoadingFinished(self, msg):
+      print self.getMethodHeader(msg)
+      print "  request: ", self.getRequestSummary(msg)
+
+   def handleNetworkRequestServedFromCache(self, msg):
+      print self.getMethodHeader(msg)
+      print "  request: ", self.getRequestSummary(msg)
+
+   def handleNetworkRequestServedFromMemoryCache(self, msg):
+      print self.getMethodHeader(msg)
+      print "  request: ", self.getRequestSummary(msg)
+      print "      url: ", msg.params.documentURL
+
+   def handleNetworkRequestWillBeSent(self, msg):
+      self._requestDetails[msg.params.requestId] = Bunch(requestId = msg.params.requestId,
+         request     = msg.params.request,
+         loaderId    = msg.params.loaderId,
+         documentUrl = msg.params.documentURL,
+         startTs     = msg.params.timestamp,
+         initiator   = msg.params.initiator,
+         stack       = msg.params.stackTrace)
+
+      print self.getMethodHeader(msg)
+      print "  request: ", self.getRequestSummary(msg)
+      print "      url: ", msg.params.documentURL
+
+   def handleNetworkResponseReceived(self, msg):
+      resp = msg.params.response
+      print self.getMethodHeader(msg)
+      print "    request: ", self.getRequestSummary(msg)
+      print "       type: ", msg.params.type
+      print "     reused: ", resp.connectionReused
+      print "  from disk: ", resp.fromDiskCache
+      print "       mime: ", resp.mimeType
+      print "     status: [%s] %s" % (resp.status, resp.statusText)
+
+
+   # ---- Helpers ---- #
+   def getMethodHeader(self, msg):
+      return "[%s] ==[ %s ]=====" % (self.getTS(msg), msg.method)
+
+   def getRequestSummary(self, msg):
+      req_record = self._requestDetails.get(msg.params.requestId, None)
+      if req_record:
+         return "[%s] %s" % (msg.params.requestId, req_record.request.url)
+      else:
+         return "[%s] {unknown}" % msg.params.requestId
+
+   def getTS(self, msg):
+      """ Returns a timestamp string to use as prefix """
+      ts_value = None
+      if hasattr(msg, 'params'):
+         ts_value = msg.params.get('timestamp', None)
+
+      if ts_value is None:
+         return '<nots>'
+      else:
+         ts_delta = ts_value - self.timeStart
+         return "%8.4f" % ts_delta
 
 
 def main():
