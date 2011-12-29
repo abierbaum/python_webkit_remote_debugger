@@ -15,6 +15,13 @@ class Bunch(object):
 
    def get(self, *args, **kwds):
       return self.__dict__.get(*args, **kwds)
+   
+   def get_first(self, *args):
+      """ Return the first attribute found. """
+      for name in args:
+         if hasattr(self, name):
+            return getattr(self, name)
+      raise AttributeError('could not find one of: %s' % args)
 
    def has_key(self, *args, **kwds):
       return self.__dict__.has_key(*args, **kwds)
