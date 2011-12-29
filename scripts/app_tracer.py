@@ -93,17 +93,14 @@ class TracerApp(object):
 
 
    def start(self):
-      # if ipv6
-      if 0:
-         ws.io_sock = ws.sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-      #ws.connect("ws://localhost:9999/devtools/page/1")
       self.ws_url = "ws://%s:%s/devtools/page/%s" % (self.host, self.port, self.page_num)
 
       self.ws = WebSocketApp(self.ws_url,
          on_open    = self.onOpen,
          on_message = self.onMessage,
          on_error   = self.onError,
-         on_close   = self.onClose)
+         on_close   = self.onClose,
+         ipv6 = self.ios)
 
       self.ws.run_forever()
 
