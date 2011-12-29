@@ -116,6 +116,8 @@ class TracerApp(object):
       #self.send('Runtime.evaluate', {'expression': 'alert("hello from python")'})
       #self.send('Timeline.start', {'maxCallStackDepth': 5})
       self.send('Network.enable')
+      self.send('Console.enable')
+      self.send('Timeline.start',  {'maxCallStackDepth': 5})
 
    def onMessage(self, ws, message):
       # Decode message into a bunch object to make easier to access attributes
@@ -171,6 +173,27 @@ class TracerApp(object):
    def handleNotificationDefault(self, msg):
       """ By default just print the method name. """
       print self.getMethodHeader(msg)
+
+   # --- Console Notification Processing --- #
+   def handleConsoleMessageAdded(self, msg):
+      print self.getMethodHeader(msg)
+      cmsg = msg.params.message
+      print "  msg: [%s] %s" % (cmsg.level, cmsg.text)
+
+
+   # --- Timeline Notification Processing -- #
+   def handleTimelineEventRecorded(self, msg):
+      record = msg.params.record
+      record_raw = msg._rawMsg.get('params').get('record')
+      print "[%s] ==[ %s:%s ]=====" % ('', #self.getDeltaTsStr(record.endTime),
+                                       msg.method, record.type)
+      print "        mem: %s/%s MB"  % (record.usedHeapSize / (1024*1024),
+                                        record.totalHeapSize / (1024*1024))
+      if record.has_key('endTime'):
+         print "   duration: ", (record.endTime - record.startTime)
+      print "       data: ", json.dumps(record_raw.get('data'), indent = 2)
+      #print "   children: ", json.dumps(record_raw.get('children'), indent = 2)
+
 
    # --- Network Notification Processing --- #
    def handleNetworkDataReceived(self, msg):
@@ -240,8 +263,11 @@ class TracerApp(object):
       if ts_value is None:
          return '<nots>'
       else:
-         ts_delta = ts_value - self.timeStart
-         return "%8.4f" % ts_delta
+         return self.getDeltaTsStr(ts_value)
+
+   def getDeltaTsStr(self, ts):
+      ts_delta = ts - self.timeStart
+      return "%8.4f" % ts_delta
 
 
 def main():
