@@ -8,6 +8,7 @@ import urllib
 import urllib2
 import socket
 import sys
+import types
 
 file_dir  = os.path.abspath(os.path.dirname(__file__))
 deps_dir  = os.path.abspath(os.path.join(file_dir, '..', 'deps'))
@@ -41,9 +42,13 @@ class TracerApp(object):
    Main tracer application.
    """
    def __init__(self, options):
+      self.counter  = 0
       self.host     = options.host
       self.port     = options.port
       self.page_num = options.page_num
+
+      self.ws_url = None
+      self.ws     = None
 
    def showConnectionList(self):
       """
@@ -58,54 +63,67 @@ class TracerApp(object):
          print "   url: ", page.get('url', '')
          print "   ws_debug_url: ", page.get('webSocketDebuggerUrl', '')
 
-   def other(self):
+
+   def start(self):
       # if ipv6
       if 0:
          ws.io_sock = ws.sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
       #ws.connect("ws://localhost:9999/devtools/page/1")
-      ws_url = "ws://localhost:%s/devtools/page/%s" % (debug_port, page)
+      self.ws_url = "ws://%s:%s/devtools/page/%s" % (self.host, self.port, self.page_num)
+
+      self.ws = WebSocketApp(self.ws_url,
+         on_open    = self.onOpen,
+         on_message = self.onMessage,
+         on_error   = self.onError,
+         on_close   = self.onClose)
+
+      self.ws.run_forever()
 
 
-      def on_message(ws, message):
-         print "< raw: ", message
+   def send(self, method, params = None):
+      self.counter += 1
 
-      def on_error(ws, error):
-         print "error: ", error
-
-      def on_close(ws):
-         print "CLOSED"
-
-      def on_open(ws):
-         #send('Runtime.evaluate', {'expression': '1+1'})
-         #send('Runtime.evaluate', {'expression': 'alert("hello from python")'})
-         #send('Timeline.start', {'maxCallStackDepth': 5})
-         send('Network.enable')
-
-      gCounter = 0
-
-      def send(method, params = None):
-         global gCounter
-         gCounter += 1
-         # separators is important, you'll get "Message should be in JSON format." otherwise
-         msg_data = {"id": gCounter, "method": method}
-         if params is not None:
-            msg_data['params'] = params
-         message = json.dumps(msg_data, separators=(',', ':'))
-         print "> %s" % (message,)
-         ws.send(message)
-
-      def recv():
-         result = ws.recv()
-         print "< %s" % (result,)
+      # separators is important, you'll get "Message should be in JSON format." otherwise
+      msg_data = {"id": self.counter, "method": method}
+      if params is not None:
+         msg_data['params'] = params
+      message = json.dumps(msg_data, separators=(',', ':'))
+      print "> %s" % (message,)
+      self.ws.send(message)
 
 
-      ws = WebSocketApp(ws_url,
-            on_open    = on_open,
-            on_message = on_message,
-            on_error   = on_error,
-            on_close   = on_close)
+   def recv(self):
+      result = self.ws.recv()
+      print "< %s" % (result,)
+      return result
 
-      ws.run_forever()
+
+   # ---- PRIMARY CALLBACKS ---- #
+   def onOpen(self, ws):
+      #self.send('Runtime.evaluate', {'expression': '1+1'})
+      #self.send('Runtime.evaluate', {'expression': 'alert("hello from python")'})
+      #self.send('Timeline.start', {'maxCallStackDepth': 5})
+      self.send('Network.enable')
+
+   def onMessage(self, ws, message):
+      #msg_data = json.loads(message)
+
+      #print "< raw: ", message
+      #print json.dumps(msg_data, sort_keys=True, indent=3)
+      self.prettyPrintMsg(message)
+
+   def onError(self, ws, error):
+      print "error: ", error
+
+   def onClose(self, ws):
+      print "CLOSED"
+
+
+   # --- Helpers ---- #
+   def prettyPrintMsg(self, msg):
+      if type(msg) in types.StringTypes:
+         msg = json.loads(msg)
+      print json.dumps(msg, sort_keys=True, indent=3)
 
 
 def main():
@@ -115,6 +133,8 @@ def main():
    # Handle case where there is no page
    if options.page_num is None:
       app.showConnectionList()
+   else:
+      app.start()
 
 
 if __name__ == "__main__":
