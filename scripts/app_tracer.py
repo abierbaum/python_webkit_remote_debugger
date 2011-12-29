@@ -26,6 +26,8 @@ from websocket import WebSocket, WebSocketApp
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
 
+onDarwin = sys.platform == 'darwin'
+
 def parseOptions():
    usage = "%prog [options] page_num"
    epilog = "Note: run with no page num to see list of potential pages"
@@ -35,6 +37,8 @@ def parseOptions():
                      help = "The host to connect to. [%default]")
    parser.add_option("--port", type="int", default=9999,
                       help = "The port the remote debugger is running on. [%default]")
+   parser.add_option("--ios", action="store_true", default=False,
+                      help = "Use this if you are trying to connect to mobile safari")
 
    (options, args) = parser.parse_args()
    options.page_num = None
@@ -52,6 +56,7 @@ class TracerApp(object):
       self.counter  = 0
       self.host     = options.host
       self.port     = options.port
+      self.ios      = options.ios
       self.page_num = options.page_num
 
       self.timeStart = time.mktime(time.localtime())
@@ -66,14 +71,25 @@ class TracerApp(object):
       """
       Print out list of possible debugger connections
       """
-      pages_url  = "http://%s:%s/json" % (self.host, self.port)
+      # Mobile safari has a different listing page
+      if self.ios:
+         pages_url  = "http://%s:%s/listing.json" % (self.host, self.port)
+      else:
+         pages_url  = "http://%s:%s/json" % (self.host, self.port)
+         
       pages      = urllib2.urlopen(pages_url)
       pages_data = json.loads(pages.read())
       for page in pages_data:
          print "----------------------------------------------------------"
-         print "Page: ", page.get('title', '')
-         print "   url: ", page.get('url', '')
-         print "   ws_debug_url: ", page.get('webSocketDebuggerUrl', '')
+         if self.ios:
+            print "Page: ", page.get('pageTitle')
+            print "    id: ", page.get('pageId')
+            print "   url: ", page.get('pageURL')
+            print "  debug url: ", page.get('debugURL')
+         else:
+            print "Page: ", page.get('title', '')
+            print "   url: ", page.get('url', '')
+            print "   ws_debug_url: ", page.get('webSocketDebuggerUrl', '')
 
 
    def start(self):
