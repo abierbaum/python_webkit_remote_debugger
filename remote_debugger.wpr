@@ -1,0 +1,16 @@
+#!wing
+#!version=3.0
+##################################################################
+# Wing IDE project file                                          #
+##################################################################
+[project attributes]
+proj.directory-list = [{'dirloc': loc('scripts'),
+                        'excludes': (),
+                        'filter': '*',
+                        'include_hidden': False,
+                        'recursive': True,
+                        'watch_for_changes': True}]
+proj.file-list = [loc('deps/websocket-client/examples/echoapp_client.py'),
+                  loc('deps/websocket-client/test_websocket.py'),
+                  loc('deps/websocket-client/websocket.py')]
+proj.file-type = 'shared'
