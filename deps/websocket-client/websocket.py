@@ -189,12 +189,17 @@ class WebSocket(object):
     'Hello, Server'
     >>> ws.close()
     """
-    def __init__(self):
+    def __init__(self, ipv6 = False):
         """
         Initalize WebSocket object.
         """
         self.connected = False
-        self.io_sock = self.sock = socket.socket()
+        
+        if ipv6:
+            self.io_sock = self.sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        else:
+            self.io_sock = self.sock = socket.socket()
+      
 
     def settimeout(self, timeout):
         """
@@ -452,7 +457,7 @@ class WebSocketApp(object):
     """
     def __init__(self, url,
                  on_open = None, on_message = None, on_error = None, 
-                 on_close = None):
+                 on_close = None, ipv6 = False):
         """
         url: websocket url.
         on_open: callable object which is called at opening websocket.
@@ -474,6 +479,7 @@ class WebSocketApp(object):
         self.on_error = on_error
         self.on_close = on_close
         self.sock = None
+        self.ipv6 = ipv6
 
     def send(self, data):
         """
@@ -495,7 +501,7 @@ class WebSocketApp(object):
         if self.sock:
             raise WebSocketException("socket is already opened")
         try:
-            self.sock = WebSocket()
+            self.sock = WebSocket(ipv6=self.ipv6)
             self.sock.connect(self.url)
             self._run_with_no_err(self.on_open)
             while True:
