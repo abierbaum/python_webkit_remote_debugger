@@ -5,3 +5,9 @@ This project was created to help debug some webapps I wrote on iOS.  The problem
 Thanks to also on stackoverflow [see herere](http://stackoverflow.com/questions/8599408/is-it-possible-to-connect-to-mobile-safari-remote-debugger-protocol-using-python) I think I can do it in python.  
 
 So this project is the attempt to do just that.
+
+
+References
+==========
+  * [websocket-client](https://github.com/liris/websocket-client): Python library we use
+  * [Chrome Dev Tools: Remote Debugging](http://code.google.com/chrome/devtools/docs/remote-debugging.html): Reference for how to setup, use, and communicate with the debugger in Chrome.
