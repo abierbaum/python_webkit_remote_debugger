@@ -200,8 +200,8 @@ class TracerApp(object):
       record_raw = msg._rawMsg.get('params').get('record')
       print "[%s] ==[ %s:%s ]=====" % ('', #self.getDeltaTsStr(record.endTime),
                                        msg.method, record.type)
-      print "        mem: %s/%s MB"  % (record.usedHeapSize / (1024*1024),
-                                        record.totalHeapSize / (1024*1024))
+      print "        mem: %.2f/%.2f MB"  % (record.usedHeapSize / (1024.0*1024.0),
+                                        record.totalHeapSize / (1024.0*1024.0))
       if record.has_key('endTime'):
          print "   duration: ", (record.endTime - record.startTime)
       print "       data: ", json.dumps(record_raw.get('data'), indent = 2)
@@ -233,12 +233,13 @@ class TracerApp(object):
       print "      url: ", msg.params.documentURL
 
    def handleNetworkRequestWillBeSent(self, msg):
-      self._requestDetails[msg.params.requestId] = Bunch(requestId = msg.params.requestId,
+      request_id = msg.params.get_first('requestId', 'identifier')
+      self._requestDetails[request_id] = Bunch(requestId = request_id,
          request     = msg.params.request,
          loaderId    = msg.params.loaderId,
          documentUrl = msg.params.documentURL,
          startTs     = msg.params.timestamp,
-         initiator   = msg.params.initiator,
+         initiator   = msg.params.get('initiator', None),
          stack       = msg.params.stackTrace)
 
       print self.getMethodHeader(msg)
@@ -261,11 +262,12 @@ class TracerApp(object):
       return "[%s] ==[ %s ]=====" % (self.getTS(msg), msg.method)
 
    def getRequestSummary(self, msg):
-      req_record = self._requestDetails.get(msg.params.requestId, None)
+      request_id = msg.params.get_first('requestId', 'identifier')
+      req_record = self._requestDetails.get(request_id, None)
       if req_record:
-         return "[%s] %s" % (msg.params.requestId, req_record.request.url)
+         return "[%s] %s" % (request_id, req_record.request.url)
       else:
-         return "[%s] {unknown}" % msg.params.requestId
+         return "[%s] {unknown}" % request_id
 
    def getTS(self, msg):
       """ Returns a timestamp string to use as prefix """
