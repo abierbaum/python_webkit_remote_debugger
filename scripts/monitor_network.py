@@ -48,16 +48,21 @@ def on_close(ws):
    print "CLOSED"
 
 def on_open(ws):
-   send('Runtime.evaluate', {'expression': '1+1'})
-   send('Runtime.evaluate', {'expression': 'alert("hello from python")'})
+   #send('Runtime.evaluate', {'expression': '1+1'})
+   #send('Runtime.evaluate', {'expression': 'alert("hello from python")'})
+   #send('Timeline.start', {'maxCallStackDepth': 5})
+   send('Network.enable')
 
 gCounter = 0
 
-def send(method, params):
+def send(method, params = None):
    global gCounter
    gCounter += 1
    # separators is important, you'll get "Message should be in JSON format." otherwise
-   message = json.dumps({"id": gCounter, "method": method, "params": params}, separators=(',', ':'))
+   msg_data = {"id": gCounter, "method": method}
+   if params is not None:
+      msg_data['params'] = params
+   message = json.dumps(msg_data, separators=(',', ':'))
    print "> %s" % (message,)
    ws.send(message)
 
