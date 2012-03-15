@@ -61,6 +61,9 @@ class TracerApp(object):
 
       self.timeStart = time.mktime(time.localtime())
 
+      self.shouldStep  = True    # If we should try to single step the debugger
+      self._isStepping = False   # If we are currently inside stepping
+
       self.ws_url = None
       self.ws     = None
 
@@ -76,7 +79,7 @@ class TracerApp(object):
          pages_url  = "http://%s:%s/listing.json" % (self.host, self.port)
       else:
          pages_url  = "http://%s:%s/json" % (self.host, self.port)
-         
+
       pages      = urllib2.urlopen(pages_url)
       pages_data = json.loads(pages.read())
       for page in pages_data:
@@ -128,9 +131,11 @@ class TracerApp(object):
       #self.send('Runtime.evaluate', {'expression': '1+1'})
       #self.send('Runtime.evaluate', {'expression': 'alert("hello from python")'})
       #self.send('Timeline.start', {'maxCallStackDepth': 5})
-      self.send('Network.enable')
-      self.send('Console.enable')
-      self.send('Timeline.start',  {'maxCallStackDepth': 5})
+      #self.send('Network.enable')
+      #self.send('Console.enable')
+      #self.send('Timeline.start',  {'maxCallStackDepth': 5})
+      self.send('Debugger.enable')
+
 
    def onMessage(self, ws, message):
       # Decode message into a bunch object to make easier to access attributes
@@ -144,7 +149,7 @@ class TracerApp(object):
          self.handleMethodMsg(msg)
       else:
          print "UNKNOWN MSG TYPE: "
-         self.prettyPrintMsg(msg_data)
+         self.prettyPrintMsg(msg)
 
    def onError(self, ws, error):
       print "error: ", error
@@ -158,7 +163,7 @@ class TracerApp(object):
       if type(msg) in types.StringTypes:
          msg = json.loads(msg)
       elif type(msg) == Bunch:
-         msg = json.loads(msg._rawMsg)
+         msg = msg._rawMsg
 
       print json.dumps(msg, sort_keys=True, indent=3)
 
@@ -255,6 +260,35 @@ class TracerApp(object):
       print "  from disk: ", resp.fromDiskCache
       print "       mime: ", resp.mimeType
       print "     status: [%s] %s" % (resp.status, resp.statusText)
+
+
+   def handleDebuggerDebuggerWasEnabled(self, msg):
+      print self.getMethodHeader(msg)
+
+      if self.shouldStep:
+         self.send('Debugger.pause')
+      #   self.send('Debugger.stepInto')
+      #   self._isStepping = True
+
+
+   def handleDebuggerPaused(self, msg):
+      print self.getMethodHeader(msg)
+      print "   reason: ", msg.params.reason
+
+      params_raw = msg._rawMsg.get('params')
+      print "       data: ", json.dumps(params_raw.get('data'), indent = 2)
+      print "       frame: ", json.dumps(params_raw.get('callFrames'), indent = 2)
+
+      if self.shouldStep:
+         self.send('Debugger.stepInto')
+
+
+   def handleDebuggerResumed(self, msg):
+      print self.getMethodHeader(msg)
+
+   def handleDebuggerScriptParsed(self, msg):
+      print self.getMethodHeader(msg)
+      print json.dumps(msg._rawMsg.get('params'), indent = 2)
 
 
    # ---- Helpers ---- #
